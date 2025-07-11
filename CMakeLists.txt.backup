@@ -1,0 +1,171 @@
+cmake_minimum_required(VERSION 3.20)
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED)
+
+set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake") 
+    audio_core
+    portaudio_static
+    RtMidi::rtmidi
+    fmt::fmt
+)
+
+
+if(APPLE):cripts/buildsystems/vcpkg.cmake")
+
+project(port_audio_engine VERSION 0.1.0 LANGUAGES C CXX)
+
+add_executable(${PROJECT_NAME} 
+    ${CMAKE_SOURCE_DIR}/src/main.cpp
+)
+
+# Add recording test executable
+add_executable(test_recording 
+    ${CMAKE_SOURCE_DIR}/src/test_recording.cpp
+)
+
+# Add CHOC FIFO test executable
+add_executable(test_choc_fifo 
+    ${CMAKE_SOURCE_DIR}/src/test_choc_fifo.cpp
+)
+
+# Add AudioRecorder FIFO test executable
+add_executable(test_recorder_fifo 
+    ${CMAKE_SOURCE_DIR}/src/test_recorder_fifo.cpp
+)
+
+# Add simple AudioPlayer test executable
+add_executable(test_player_simple 
+    ${CMAKE_SOURCE_DIR}/src/test_player_simple.cpp
+)
+
+# Also add core sources to test_player_simple
+target_sources(test_player_simple PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/core/AudioEngine.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/AudioNode.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/GainNode.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/AudioGraph.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/AudioPlayer.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/AudioParameter.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/Logger.cpp
+)
+
+# Add test executables
+add_executable(test_parameters 
+    ${CMAKE_SOURCE_DIR}/src/test_parameters.cpp
+)
+
+add_executable(test_parameter_integration 
+    ${CMAKE_SOURCE_DIR}/src/test_parameter_integration.cpp
+)
+
+# Add analyzer nodes test executable
+add_executable(test_analyzers 
+    ${CMAKE_SOURCE_DIR}/src/test_analyzers.cpp
+)
+
+# Add core sources to test_parameters
+target_sources(test_parameters PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/core/AudioParameter.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/Logger.cpp
+)
+
+add_subdirectory(src/core)
+target_include_directories(${PROJECT_NAME} PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/core
+)
+
+target_include_directories(test_recording PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/core
+)
+
+target_include_directories(test_choc_fifo PRIVATE
+    ${CMAKE_SOURCE_DIR}/lib/choc
+)
+
+target_include_directories(test_recorder_fifo PRIVATE
+    ${CMAKE_SOURCE_DIR}/lib/choc
+)
+
+target_include_directories(test_player_simple PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/core
+)
+
+target_include_directories(test_parameters PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/core
+)
+
+target_include_directories(test_analyzers PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/core
+)
+
+# ...existing code...
+
+find_package(portaudio CONFIG REQUIRED)
+target_link_libraries(${PROJECT_NAME} PRIVATE portaudio_static)
+target_link_libraries(test_recording PRIVATE portaudio_static)
+
+find_package(rtmidi CONFIG REQUIRED)
+target_link_libraries(${PROJECT_NAME} PRIVATE RtMidi::rtmidi)
+target_link_libraries(test_recording PRIVATE RtMidi::rtmidi)
+
+find_package(fmt CONFIG REQUIRED)
+target_link_libraries(${PROJECT_NAME} PRIVATE fmt::fmt)
+target_link_libraries(test_recording PRIVATE fmt::fmt)
+target_link_libraries(test_player_simple PRIVATE portaudio_static)
+target_link_libraries(test_player_simple PRIVATE RtMidi::rtmidi)
+target_link_libraries(test_player_simple PRIVATE fmt::fmt)
+target_link_libraries(test_parameter_integration PRIVATE 
+    audio_core
+    portaudio_static
+    RtMidi::rtmidi
+    fmt::fmt
+)
+
+target_include_directories(test_parameter_integration PRIVATE
+    ${CMAKE_SOURCE_DIR}/src
+    ${CMAKE_SOURCE_DIR}/lib/choc
+)
+
+target_include_directories(${PROJECT_NAME} PRIVATE
+    ${CMAKE_SOURCE_DIR}/lib/choc
+)
+
+target_include_directories(test_recording PRIVATE
+    ${CMAKE_SOURCE_DIR}/lib/choc
+)
+
+target_include_directories(test_choc_fifo PRIVATE
+    ${CMAKE_SOURCE_DIR}/lib/choc
+)
+
+target_include_directories(${PROJECT_NAME} PRIVATE
+    ${CMAKE_SOURCE_DIR}/lib/sigslot
+)
+
+target_include_directories(${PROJECT_NAME} PRIVATE
+    ${CMAKE_SOURCE_DIR}/lib/concurrentqueue
+)
+
+# Link libraries for test_analyzers
+target_link_libraries(test_analyzers PRIVATE 
+    audio_core
+    portaudio_static
+    RtMidi::rtmidi
+    fmt::fmt
+)
+
+
+if(APPLE)
+  target_link_libraries(${PROJECT_NAME} PRIVATE
+  "-framework CoreMidi"
+  "-framework Cocoa"
+  "-framework Accelerate"
+  "-framework AudioToolbox"
+  "-framework AudioUnit"
+  "-framework CoreServices"
+  "-framework CoreAudio"
+  "-framework Carbon"
+  "-framework CoreFoundation"
+    "-framework IOKit"
+  )
+endif()

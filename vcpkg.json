@@ -1,0 +1,7 @@
+{
+    "dependencies": [
+        "rtmidi",
+        "portaudio",
+        "fmt"
+    ]
+}
