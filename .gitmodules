@@ -1,0 +1,6 @@
+[submodule "lib/choc"]
+	path = lib/choc
+	url = https://github.com/Tracktion/choc.git
+[submodule "lib/concurrentqueue"]
+	path = lib/concurrentqueue
+	url = https://github.com/cameron314/concurrentqueue.git
