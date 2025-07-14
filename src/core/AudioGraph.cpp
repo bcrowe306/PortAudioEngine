@@ -138,6 +138,7 @@ void AudioGraph::removeOutputNode(std::shared_ptr<AudioNode> node) {
 }
 
 void AudioGraph::prepare(const AudioNode::PrepareInfo& info) {
+    std::cout << "Preparing AudioGraph with " << nodes.size() << " nodes..." << std::endl;
     SpinLockGuard lock(compilationLock);
     
     currentPrepareInfo = info;
@@ -161,6 +162,7 @@ void AudioGraph::performGraphModification(std::function<void()> modification) {
 
 std::shared_ptr<AudioGraph::CompiledGraph> AudioGraph::getCompiledGraph() {
     if (needsRecompile()) {
+        std::cout << "Graph recompiling..." << std::endl;
         currentCompiledGraph = compileGraph();
         isDirty.store(false);
     }
@@ -196,7 +198,6 @@ std::shared_ptr<AudioGraph::CompiledGraph> AudioGraph::compileGraph() {
     compiled->outputNodes = outputNodes;
     compiled->prepared = prepared;
     compiled->prepareInfo = currentPrepareInfo;
-    
     return compiled;
 }
 
@@ -316,6 +317,7 @@ AudioGraphProcessor::AudioGraphProcessor() {
 }
 
 void AudioGraphProcessor::setCompiledGraph(std::shared_ptr<AudioGraph::CompiledGraph> graph) {
+    std::cout << "Setting compiled graph with " << graph->instructions.size() << " instructions..." << std::endl;
     SpinLockGuard lock(graphLock);
     compiledGraph = graph;
 }

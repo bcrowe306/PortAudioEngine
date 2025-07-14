@@ -3,6 +3,7 @@
 #include <cstring>
 #include <chrono>
 #include <iostream>
+#include <algorithm>
 
 AudioEngine::AudioEngine() {
     PaError err = Pa_Initialize();
@@ -60,23 +61,37 @@ void AudioEngine::startStream(int inputDeviceIndex, int outputDeviceIndex, int b
     if (inputDeviceIndex >= 0 && inputDeviceIndex < (int)inputDevices.size()) {
         const DeviceInfo& dev = inputDevices[inputDeviceIndex];
         inputParams.device = dev.index;
-        inputParams.channelCount = dev.maxInputChannels;
+        // Use configured input channels, but clamp to device max
+        // If no input channels configured, default to device max or 2, whichever is smaller
+        int desiredInputChannels = (inputChannels > 0) ? inputChannels : std::min(2, dev.maxInputChannels);
+        inputParams.channelCount = std::min(desiredInputChannels, dev.maxInputChannels);
         inputParams.sampleFormat = paFloat32;
         inputParams.suggestedLatency = Pa_GetDeviceInfo(dev.index)->defaultLowInputLatency;
         inputParams.hostApiSpecificStreamInfo = nullptr;
+        
+        // Update actual input channels being used
+        inputChannels = inputParams.channelCount;
     } else {
         inputParams.device = paNoDevice;
+        inputChannels = 0;  // No input
     }
 
     if (outputDeviceIndex >= 0 && outputDeviceIndex < (int)outputDevices.size()) {
         const DeviceInfo& dev = outputDevices[outputDeviceIndex];
         outputParams.device = dev.index;
-        outputParams.channelCount = dev.maxOutputChannels;
+        // Use configured output channels, but clamp to device max
+        // If no output channels configured, default to 2 (stereo) or device max, whichever is smaller
+        int desiredOutputChannels = (outputChannels > 0) ? outputChannels : std::min(2, dev.maxOutputChannels);
+        outputParams.channelCount = std::min(desiredOutputChannels, dev.maxOutputChannels);
         outputParams.sampleFormat = paFloat32;
         outputParams.suggestedLatency = Pa_GetDeviceInfo(dev.index)->defaultLowOutputLatency;
         outputParams.hostApiSpecificStreamInfo = nullptr;
+        
+        // Update actual output channels being used
+        outputChannels = outputParams.channelCount;
     } else {
         outputParams.device = paNoDevice;
+        outputChannels = 0;  // No output
     }
 
     PaError err = Pa_OpenStream(
@@ -130,12 +145,13 @@ void AudioEngine::setSampleRate(double sampleRate_) {
     sampleRate = sampleRate_;
 }
 
+// TODO:Fix Implement audio graph preparation
 void AudioEngine::prepareAudioGraph() {
     if (audioGraph && sampleRate > 0 && bufferSize > 0) {
         AudioNode::PrepareInfo info;
         info.sampleRate = sampleRate;
         info.maxBufferSize = bufferSize;
-        info.numChannels = 2; // Assuming stereo for now
+        info.numChannels = outputChannels; // Use actual output channel count
         
         audioGraph->prepare(info);
     }
@@ -190,29 +206,21 @@ int AudioEngine::paCallback(
     // Check if graph needs recompilation and update processor atomically
     // We do this in the audio thread but try to minimize blocking
     if (engine->audioGraph && engine->audioGraph->needsRecompile()) {
+        std::cout << "Engine recompiling audio graph..." << std::endl;
         // Try to get current compiled graph first (lock-free)
-        auto currentGraph = engine->audioGraph->getCurrentCompiledGraph();
-        if (!currentGraph) {
-            // Only compile if we don't have any graph yet
-            auto compiledGraph = engine->audioGraph->getCompiledGraph();
-            if (engine->processor && compiledGraph) {
-                engine->processor->setCompiledGraph(compiledGraph);
-            }
-        } else {
-            // We have a graph, try to get updated one (may block briefly with SpinLock)
-            auto compiledGraph = engine->audioGraph->getCompiledGraph();
-            if (engine->processor && compiledGraph) {
-                engine->processor->setCompiledGraph(compiledGraph);
-            }
+        engine->prepareAudioGraph();
+        auto compiledGraph = engine->audioGraph->getCompiledGraph();
+        if (engine->processor && compiledGraph) {
+            engine->processor->setCompiledGraph(compiledGraph);
         }
     }
     
-    if (outputBuffer && engine->processor) {
+    if (outputBuffer && engine->processor && engine->outputChannels > 0) {
         // Convert PortAudio interleaved buffer to separate channel pointers
         float* interleavedOutput = static_cast<float*>(outputBuffer);
         
-        // For simplicity, assume stereo output (2 channels)
-        const int numChannels = 2;
+        // Use actual output channel count
+        const int numChannels = engine->outputChannels;
         const int numSamples = static_cast<int>(framesPerBuffer);
         
         // Create temporary deinterleaved buffers
@@ -243,13 +251,17 @@ int AudioEngine::paCallback(
         // Debug: Check if we have audio
         static int audioDebugCount = 0;
         if (audioDebugCount < 2) {
-            std::cout << "Audio callback - first sample: " << channelBuffers[0][0] 
-                      << ", " << channelBuffers[1][0] << std::endl;
+            std::cout << "Audio callback - channels: " << numChannels 
+                      << ", first sample: " << channelBuffers[0][0];
+            if (numChannels > 1) {
+                std::cout << ", " << channelBuffers[1][0];
+            }
+            std::cout << std::endl;
             audioDebugCount++;
         }
-    } else if (outputBuffer) {
+    } else if (outputBuffer && engine->outputChannels > 0) {
         // Fallback: just zero the output
-        std::memset(outputBuffer, 0, framesPerBuffer * sizeof(float) * 2);
+        std::memset(outputBuffer, 0, framesPerBuffer * sizeof(float) * engine->outputChannels);
     }
     
     return paContinue;
