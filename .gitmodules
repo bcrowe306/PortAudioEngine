@@ -7,3 +7,6 @@
 [submodule "lib/cmajor"]
 	path = lib/cmajor
 	url = https://github.com/cmajor-lang/cmajor.git
+[submodule "lib/sigslot"]
+	path = lib/sigslot
+	url = https://github.com/palacaze/sigslot.git
