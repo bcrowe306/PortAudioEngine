@@ -10,3 +10,6 @@
 [submodule "lib/sigslot"]
 	path = lib/sigslot
 	url = https://github.com/palacaze/sigslot.git
+[submodule "lib/spdlog"]
+	path = lib/spdlog
+	url = https://github.com/gabime/spdlog.git
