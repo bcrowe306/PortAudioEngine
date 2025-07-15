@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/AudioEngine.h"
+#include "core/Logger.h"
 #include <iostream>
 
 class OfflineRenderExamples {
@@ -13,7 +14,7 @@ public:
         params.renderSampleRate = 44100.0;
         params.renderBufferSize = 1024;
         
-        std::cout << "Rendering " << seconds << " seconds to: " << outputPath << std::endl;
+        Logger::info("Rendering {} seconds to: {}", seconds, outputPath);
         return engine.renderOffline(params);
     }
     
@@ -25,7 +26,7 @@ public:
         params.renderSampleRate = 44100.0;
         params.renderBufferSize = 1024;
         
-        std::cout << "Rendering " << samples << " samples to: " << outputPath << std::endl;
+        Logger::info("Rendering {} samples to: {}", samples, outputPath);
         return engine.renderOffline(params);
     }
     
@@ -41,8 +42,7 @@ public:
         params.renderBufferSize = 1024;
         
         double seconds = (ticks / (double)tpqn) * (60.0 / bpm);
-        std::cout << "Rendering " << ticks << " ticks (" << seconds << " seconds at " 
-                  << bpm << " BPM) to: " << outputPath << std::endl;
+        Logger::info("Rendering {} ticks ({:.2f} seconds at {} BPM) to: {}", ticks, seconds, bpm, outputPath);
         return engine.renderOffline(params);
     }
     
@@ -56,7 +56,7 @@ public:
         params.renderSampleRate = 44100.0;
         params.renderBufferSize = 1024;
         
-        std::cout << "Rendering single node for " << seconds << " seconds to: " << outputPath << std::endl;
+        Logger::info("Rendering single node for {} seconds to: {}", seconds, outputPath);
         return engine.renderOffline(params);
     }
     
@@ -68,31 +68,30 @@ public:
         params.renderSampleRate = 96000.0;  // High quality sample rate
         params.renderBufferSize = 2048;     // Larger buffer for better processing
         
-        std::cout << "Rendering high quality (" << params.renderSampleRate << " Hz) for " 
-                  << seconds << " seconds to: " << outputPath << std::endl;
+        Logger::info("Rendering high quality ({} Hz) for {} seconds to: {}", params.renderSampleRate, seconds, outputPath);
         return engine.renderOffline(params);
     }
     
     // Utility: Print render parameters info
     static void printRenderInfo(const AudioEngine::OfflineRenderParams& params) {
-        std::cout << "\n=== Offline Render Parameters ===" << std::endl;
-        std::cout << "Output file: " << params.outputFilePath << std::endl;
-        std::cout << "Sample rate: " << params.renderSampleRate << " Hz" << std::endl;
-        std::cout << "Buffer size: " << params.renderBufferSize << " samples" << std::endl;
+        Logger::info("=== Offline Render Parameters ===");
+        Logger::info("Output file: {}", params.outputFilePath);
+        Logger::info("Sample rate: {} Hz", params.renderSampleRate);
+        Logger::info("Buffer size: {} samples", params.renderBufferSize);
         
         int totalSamples = AudioEngine::calculateSamplesFromParams(params);
         if (totalSamples > 0) {
             double duration = totalSamples / params.renderSampleRate;
-            std::cout << "Duration: " << duration << " seconds (" << totalSamples << " samples)" << std::endl;
+            Logger::info("Duration: {:.2f} seconds ({} samples)", duration, totalSamples);
         }
         
         if (params.sourceNode) {
-            std::cout << "Rendering single node only" << std::endl;
+            Logger::info("Rendering single node only");
         } else {
-            std::cout << "Rendering entire audio graph" << std::endl;
+            Logger::info("Rendering entire audio graph");
         }
         
-        std::cout << "Include input: " << (params.includeInput ? "Yes" : "No") << std::endl;
-        std::cout << "================================\n" << std::endl;
+        Logger::info("Include input: {}", (params.includeInput ? "Yes" : "No"));
+        Logger::info("================================");
     }
 };

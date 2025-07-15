@@ -1,12 +1,12 @@
 #include "GainNode.h"
-#include "Logger.h"
 #include <algorithm>
+#include "Logger.h"
 
 GainNode::GainNode(float initialGain, const std::string& name) 
     : AudioNode(name)
     , gainParameter(std::make_unique<AudioParameter>(name + "_Gain", initialGain, 0.0f, 4.0f, 20.0f))
 {
-    Logger::debug("GainNode '", name, "' created with initial gain: ", initialGain);
+    Logger::debug("GainNode '{}' created with initial gain: {}", name, initialGain);
 }
 
 void GainNode::processCallback(

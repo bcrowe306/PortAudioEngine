@@ -1,55 +1,105 @@
 #pragma once
 
-#include <iostream>
-#include <sstream>
-
-enum class LogLevel {
-    NONE = 0,
-    ERROR = 1,
-    WARN = 2,
-    INFO = 3,
-    DEBUG = 4
-};
+#include "spdlog/spdlog.h"
+#include "spdlog/sinks/stdout_color_sinks.h"
+#include <memory>
+#include <string>
 
 class Logger {
 public:
-    static void setLevel(LogLevel level) {
-        currentLevel = level;
-    }
+    // Initialize the logger (call this at startup)
+    static void initialize();
     
-    static LogLevel getLevel() {
-        return currentLevel;
-    }
+    // Set log level
+    static void setLevel(spdlog::level::level_enum level);
     
+    // Get the current log level
+    static spdlog::level::level_enum getLevel();
+    
+    // Logging methods using spdlog with format strings
     template<typename... Args>
-    static void log(LogLevel level, Args&&... args) {
-        if (level <= currentLevel) {
-            std::ostringstream oss;
-            (oss << ... << args);
-            std::cout << oss.str() << std::endl;
+    static void error(const std::string &fmt, Args&&... args) {
+        if (logger_) {
+            logger_->error(SPDLOG_FMT_RUNTIME(fmt), std::forward<Args>(args)...);
         }
     }
     
     template<typename... Args>
-    static void error(Args&&... args) {
-        log(LogLevel::ERROR, "[ERROR] ", args...);
+    static void warn(const std::string &fmt, Args&&... args) {
+        if (logger_) {
+            logger_->warn(SPDLOG_FMT_RUNTIME(fmt), std::forward<Args>(args)...);
+        }
     }
     
     template<typename... Args>
-    static void warn(Args&&... args) {
-        log(LogLevel::WARN, "[WARN] ", args...);
+    static void info(const std::string &fmt, Args&&... args) {
+        if (logger_) {
+            logger_->info(SPDLOG_FMT_RUNTIME(fmt), std::forward<Args>(args)...);
+        }
     }
     
     template<typename... Args>
-    static void info(Args&&... args) {
-        log(LogLevel::INFO, "[INFO] ", args...);
+    static void debug(const std::string &fmt, Args&&... args) {
+        if (logger_) {
+            logger_->debug(SPDLOG_FMT_RUNTIME(fmt), std::forward<Args>(args)...);
+        }
     }
     
     template<typename... Args>
-    static void debug(Args&&... args) {
-        log(LogLevel::DEBUG, "[DEBUG] ", args...);
+    static void trace(const std::string &fmt, Args&&... args) {
+        if (logger_) {
+            logger_->trace(SPDLOG_FMT_RUNTIME(fmt), std::forward<Args>(args)...);
+        }
     }
+    
+    // Simple message logging without format strings (for single string messages)
+    static void error(const std::string& msg) {
+        if (logger_) {
+            logger_->error(msg);
+        }
+    }
+    
+    static void warn(const std::string& msg) {
+        if (logger_) {
+            logger_->warn(msg);
+        }
+    }
+    
+    static void info(const std::string& msg) {
+        if (logger_) {
+            logger_->info(msg);
+        }
+    }
+    
+    static void debug(const std::string& msg) {
+        if (logger_) {
+            logger_->debug(msg);
+        }
+    }
+    
+    static void trace(const std::string& msg) {
+        if (logger_) {
+            logger_->trace(msg);
+        }
+    }
+    
+    // For backward compatibility with old log level enum
+    enum class LogLevel {
+        NONE = 0,
+        ERROR = 1,
+        WARN = 2,
+        INFO = 3,
+        DEBUG = 4,
+        TRACE = 5
+    };
+    
+    // Convert old LogLevel to spdlog level
+    static spdlog::level::level_enum convertLogLevel(LogLevel level);
+    
+    // Legacy method for compatibility
+    static void setLevel(LogLevel level);
 
 private:
-    static LogLevel currentLevel;
+    static std::shared_ptr<spdlog::logger> logger_;
+    static bool initialized_;
 };

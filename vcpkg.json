@@ -2,6 +2,7 @@
     "dependencies": [
         "rtmidi",
         "portaudio",
-        "fmt"
+        "fmt",
+        "spdlog"
     ]
 }

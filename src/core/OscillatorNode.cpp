@@ -7,7 +7,7 @@ OscillatorNode::OscillatorNode(float frequency, WaveType waveType, const std::st
     , frequencyParameter(std::make_unique<AudioParameter>(name + "_Frequency", frequency, 20.0f, 20000.0f, 100.0f))
     , waveType(waveType)
 {
-    Logger::debug("OscillatorNode '", name, "' created with frequency: ", frequency, "Hz");
+    Logger::debug("OscillatorNode '{}' created with frequency: {}Hz", name, frequency);
 }
 
 void OscillatorNode::processCallback(

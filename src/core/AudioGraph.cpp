@@ -1,4 +1,5 @@
 #include "AudioGraph.h"
+#include "Logger.h"
 #include <algorithm>
 #include <queue>
 #include <unordered_set>
@@ -138,7 +139,7 @@ void AudioGraph::removeOutputNode(std::shared_ptr<AudioNode> node) {
 }
 
 void AudioGraph::prepare(const AudioNode::PrepareInfo& info) {
-    std::cout << "Preparing AudioGraph with " << nodes.size() << " nodes..." << std::endl;
+    Logger::debug("Preparing AudioGraph with {} nodes...", nodes.size());
     SpinLockGuard lock(compilationLock);
     
     currentPrepareInfo = info;
@@ -162,7 +163,7 @@ void AudioGraph::performGraphModification(std::function<void()> modification) {
 
 std::shared_ptr<AudioGraph::CompiledGraph> AudioGraph::getCompiledGraph() {
     if (needsRecompile()) {
-        std::cout << "Graph recompiling..." << std::endl;
+        Logger::debug("Graph recompiling...");
         currentCompiledGraph = compileGraph();
         isDirty.store(false);
     }
@@ -317,7 +318,7 @@ AudioGraphProcessor::AudioGraphProcessor() {
 }
 
 void AudioGraphProcessor::setCompiledGraph(std::shared_ptr<AudioGraph::CompiledGraph> graph) {
-    std::cout << "Setting compiled graph with " << graph->instructions.size() << " instructions..." << std::endl;
+    Logger::debug("Setting compiled graph with {} instructions...", graph->instructions.size());
     SpinLockGuard lock(graphLock);
     compiledGraph = graph;
 }

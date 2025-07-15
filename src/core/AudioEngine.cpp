@@ -1,4 +1,5 @@
 #include "AudioEngine.h"
+#include "Logger.h"
 #include <stdexcept>
 #include <cstring>
 #include <chrono>
@@ -206,7 +207,7 @@ int AudioEngine::paCallback(
     // Check if graph needs recompilation and update processor atomically
     // We do this in the audio thread but try to minimize blocking
     if (engine->audioGraph && engine->audioGraph->needsRecompile()) {
-        std::cout << "Engine recompiling audio graph..." << std::endl;
+        Logger::debug("Engine recompiling audio graph...");
         // Try to get current compiled graph first (lock-free)
         engine->prepareAudioGraph();
         auto compiledGraph = engine->audioGraph->getCompiledGraph();
@@ -276,23 +277,22 @@ int AudioEngine::paCallback(
 // Offline rendering implementation
 bool AudioEngine::renderOffline(const OfflineRenderParams& params) {
     if (params.outputFilePath.empty()) {
-        std::cerr << "Error: Output file path is required for offline rendering" << std::endl;
+        Logger::error("Output file path is required for offline rendering");
         return false;
     }
     
     // Calculate total samples to render
     int totalSamples = calculateSamplesFromParams(params);
     if (totalSamples <= 0) {
-        std::cerr << "Error: Invalid render length specified" << std::endl;
+        Logger::error("Invalid render length specified");
         return false;
     }
     
-    std::cout << "Starting offline render: " << totalSamples << " samples at " 
-              << params.renderSampleRate << " Hz" << std::endl;
+    Logger::info("Starting offline render: {} samples at {} Hz", totalSamples, params.renderSampleRate);
     
     // Prepare audio graph for offline rendering
     if (!audioGraph) {
-        std::cerr << "Error: No audio graph available for rendering" << std::endl;
+        Logger::error("No audio graph available for rendering");
         return false;
     }
     
@@ -320,7 +320,7 @@ bool AudioEngine::renderOffline(const OfflineRenderParams& params) {
     auto offlineProcessor = std::make_unique<AudioGraphProcessor>();
     auto compiledGraph = audioGraph->getCompiledGraph();
     if (!compiledGraph) {
-        std::cerr << "Error: Failed to compile audio graph for offline rendering" << std::endl;
+        Logger::error("Failed to compile audio graph for offline rendering");
         goto cleanup;
     }
     offlineProcessor->setCompiledGraph(compiledGraph);
@@ -401,7 +401,7 @@ bool AudioEngine::renderOffline(const OfflineRenderParams& params) {
             // Progress indicator
             if (samplesRendered % (totalSamples / 10) == 0) {
                 int progress = (samplesRendered * 100) / totalSamples;
-                std::cout << "Rendering progress: " << progress << "%" << std::endl;
+                Logger::debug("Rendering progress: {}%", progress);
             }
         }
         
@@ -415,18 +415,17 @@ bool AudioEngine::renderOffline(const OfflineRenderParams& params) {
         
         auto writer = wavFormat.createWriter(params.outputFilePath, fileProps);
         if (!writer) {
-            std::cerr << "Error: Failed to create WAV writer for: " << params.outputFilePath << std::endl;
+            Logger::error("Failed to create WAV writer for: {}", params.outputFilePath);
             goto cleanup;
         }
         
         if (!writer->appendFrames(fullOutputBuffer.getView())) {
-            std::cerr << "Error: Failed to write audio data to file" << std::endl;
+            Logger::error("Failed to write audio data to file");
             goto cleanup;
         }
         
-        std::cout << "Offline render completed successfully: " << params.outputFilePath << std::endl;
-        std::cout << "Rendered " << totalSamples << " samples (" 
-                  << (totalSamples / params.renderSampleRate) << " seconds)" << std::endl;
+        Logger::info("Offline render completed successfully: {}", params.outputFilePath);
+        Logger::info("Rendered {} samples ({:.2f} seconds)", totalSamples, (totalSamples / params.renderSampleRate));
         
         // Restore original state
         sampleRate = originalSampleRate;
@@ -442,7 +441,7 @@ bool AudioEngine::renderOffline(const OfflineRenderParams& params) {
         return true;
         
     } catch (const std::exception& e) {
-        std::cerr << "Error during offline rendering: " << e.what() << std::endl;
+        Logger::error("Error during offline rendering: {}", e.what());
         goto cleanup;
     }
     

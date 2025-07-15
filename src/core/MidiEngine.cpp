@@ -1,4 +1,5 @@
 #include "MidiEngine.h"
+#include "Logger.h"
 #include <algorithm>
 #include <stdexcept>
 #include "Spinlock.h"
@@ -12,10 +13,10 @@ MidiEngine::MidiEngine() {
         initialized.store(true);
         
         Logger::info("MidiEngine initialized successfully");
-        Logger::info("Found ", inputDevices.size(), " input devices and ", 
-                    outputDevices.size(), " output devices");
+        Logger::info("Found {} input devices and {} output devices", 
+                    inputDevices.size(), outputDevices.size());
     } catch (const std::exception& e) {
-        Logger::error("Failed to initialize MidiEngine: ", e.what());
+        Logger::error("Failed to initialize MidiEngine: {}", e.what());
         throw;
     }
 }
@@ -516,8 +517,7 @@ void MidiEngine::rtMidiInputCallback(double timeStamp, std::vector<unsigned char
 void MidiEngine::handleMidiInput(double timeStamp, const std::vector<unsigned char>& rawMessage, 
                                 const std::string& deviceName, unsigned int deviceIndex) {
     // Convert raw MIDI to CHOC message
-    std::cout << "Received MIDI input from '"
-              << deviceName << "' at time " << timeStamp << ": ";
+    Logger::debug("Received MIDI input from '{}' at time {}", deviceName, timeStamp);
     if (rawMessage.empty()) {
         return;
     }

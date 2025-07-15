@@ -26,15 +26,18 @@ target_link_libraries(${PROJECT_NAME} PRIVATE RtMidi::rtmidi)
 find_package(fmt CONFIG REQUIRED)
 target_link_libraries(${PROJECT_NAME} PRIVATE fmt::fmt)
 
-
+# concurrentqueue
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_SOURCE_DIR}/lib/concurrentqueue
 )
-
+# choc
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_SOURCE_DIR}/lib/choc
 )
 
+# spdlog
+find_package(spdlog CONFIG REQUIRED)
+target_link_libraries(${PROJECT_NAME} PRIVATE spdlog::spdlog_header_only)
 
 if(APPLE)
   target_link_libraries(${PROJECT_NAME} PRIVATE

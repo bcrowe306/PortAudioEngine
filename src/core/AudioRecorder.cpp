@@ -1,4 +1,5 @@
 #include "AudioRecorder.h"
+#include "Logger.h"
 #include <iostream>
 #include <cstring>
 #include <algorithm>
@@ -95,7 +96,7 @@ void AudioRecorder::startRecording(const std::string& filename) {
     
     writerThread = std::thread(&AudioRecorder::writerThreadFunction, this);
     
-    std::cout << "Started recording to: " << currentFilename << std::endl;
+    Logger::info("Started recording to: {}", currentFilename);
 }
 
 void AudioRecorder::stopRecording() {
@@ -110,7 +111,7 @@ void AudioRecorder::stopRecording() {
         writerThread.join();
     }
     
-    std::cout << "Stopped recording. Total samples: " << totalSamplesRecorded.load() << std::endl;
+    Logger::info("Stopped recording. Total samples: {}", totalSamplesRecorded.load());
 }
 
 std::vector<float> AudioRecorder::getRecordedData() const {
@@ -208,7 +209,7 @@ void AudioRecorder::writerThreadFunction() {
         writer->flush();
         writer.reset(); // This will close the file properly
         
-        std::cout << "Recording written to disk: " << totalSamplesWritten << " samples" << std::endl;
+        Logger::info("Recording written to disk: {} samples", totalSamplesWritten);
         
     } catch (const std::exception& e) {
         std::cerr << "Error during recording: " << e.what() << std::endl;

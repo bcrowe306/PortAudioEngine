@@ -2,22 +2,27 @@
 #include <thread>
 #include <chrono>
 #include "core/AudioCore.h"
+#include "core/Logger.h"
 #include "audio/choc_AudioFileFormat_WAV.h"
 #include "test_cmajor.h"
 #include "OfflineRenderExamples.h"
 
 int main(int, char**){
 
-    std::cout << "Audio Engine Demo - Filter, ADSR, PlayheadNode Integration\n";
-    std::cout << "========================================================\n\n";
+    // Initialize logging first
+    Logger::initialize();
+    Logger::setLevel(spdlog::level::debug); // Set to debug level for detailed output
+    
+    Logger::info("Audio Engine Demo - Filter, ADSR, PlayheadNode Integration");
+    Logger::info("========================================================");
 
 
     std::string fileName = "/Users/brandoncrowe/Documents/Audio Samples/DECAP - "
                             "Drums That Knock X/Hihats/DECAP hihat chonky.wav";
-    std::cout << "Creating AudioEngine...\n";
+    Logger::info("Creating AudioEngine...");
     AudioEngine audioEngine;
     auto graph = audioEngine.getAudioGraph();
-    std::cout << "Starting audio stream...\n";
+    Logger::info("Starting audio stream...");
     audioEngine.startStream(256, 44100);
 
     auto player = std::make_shared<AudioPlayer>("AudioPlayer");
@@ -36,17 +41,17 @@ int main(int, char**){
     
     player->play();
 
-    std::cout << "Creating MidiEngine...\n";
+    Logger::info("Creating MidiEngine...");
     MidiEngine midiEngine;
     midiEngine.setMidiInputCallback([&](const choc::midi::ShortMessage& message, const std::string& deviceName, 
                                        unsigned int deviceIndex) {
-        std::cout << "[" << deviceName << "] " << message.toHexString() << std::endl;
+        Logger::info("[{}] {}", deviceName, message.toHexString());
         if (message.isNoteOn()) {
             player->play();
         }
     });
     auto inputDevices = midiEngine.getInputDeviceNames();
-    std::cout << "\nEnabling MPC Studio mk2 Public input device...\n";
+    Logger::info("Enabling MPC Studio mk2 Public input device...");
     for (const auto& deviceName : inputDevices) {
         if (deviceName == "MPC Studio mk2 Public"){
         midiEngine.enableInputDevice("MPC Studio mk2 Public");

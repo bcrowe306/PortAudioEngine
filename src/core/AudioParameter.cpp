@@ -1,7 +1,7 @@
 #include "AudioParameter.h"
-#include "Logger.h"
 #include <algorithm>
 #include <cmath>
+#include "Logger.h"
 
 AudioParameter::AudioParameter(const std::string& name,
                                float initialValue,
@@ -16,8 +16,7 @@ AudioParameter::AudioParameter(const std::string& name,
     , targetValue(currentValue)
 {
     updateRampParameters();
-    Logger::debug("AudioParameter '", name, "' created: value=", currentValue, 
-                  " range=[", minValue, ",", maxValue, "] smoothing=", smoothingTimeMs, "ms");
+   
 }
 
 void AudioParameter::setValue(float value) {
@@ -52,8 +51,6 @@ void AudioParameter::setValue(float value, float rampTimeMs) {
         samplesRemaining = 0;
     }
     
-    Logger::debug("AudioParameter '", name, "' setValue: ", value, " -> ", constrainedValue, 
-                  " rampSamples=", totalRampSamples);
 }
 
 void AudioParameter::setValueImmediate(float value) {
@@ -62,7 +59,7 @@ void AudioParameter::setValueImmediate(float value) {
     targetValue.store(constrainedValue);
     samplesRemaining = 0;
     
-    Logger::debug("AudioParameter '", name, "' setValueImmediate: ", constrainedValue);
+    Logger::debug("AudioParameter '{}' setValueImmediate: {}", name, constrainedValue);
 }
 
 float AudioParameter::getNextValue() {
@@ -92,13 +89,13 @@ float AudioParameter::getNextValue() {
 void AudioParameter::setSampleRate(double newSampleRate) {
     sampleRate = newSampleRate;
     updateRampParameters();
-    Logger::debug("AudioParameter '", name, "' sample rate set to: ", sampleRate);
+    Logger::debug("AudioParameter '{}' sample rate set to: {}", name, sampleRate);
 }
 
 void AudioParameter::setSmoothingTime(float timeMs) {
     smoothingTimeMs = timeMs;
     updateRampParameters();
-    Logger::debug("AudioParameter '", name, "' smoothing time set to: ", timeMs, "ms");
+    Logger::debug("AudioParameter '{}' smoothing time set to: {}ms", name, timeMs);
 }
 
 void AudioParameter::setRange(float minVal, float maxVal) {
@@ -110,9 +107,9 @@ void AudioParameter::setRange(float minVal, float maxVal) {
         currentValue = constrainValue(currentValue);
         targetValue.store(constrainValue(targetValue.load()));
         
-        Logger::debug("AudioParameter '", name, "' range set to: [", minValue, ",", maxValue, "]");
+        Logger::debug("AudioParameter '{}' range set to: [{},{}]", name, minValue, maxValue);
     } else {
-        Logger::warn("AudioParameter '", name, "' invalid range: min=", minVal, " max=", maxVal);
+        Logger::warn("AudioParameter '{}' invalid range: min={} max={}", name, minVal, maxVal);
     }
 }
 
@@ -150,7 +147,7 @@ float AudioParameter::mapValue(float value) const {
 void AudioParameterGroup::addParameter(const std::string& name, AudioParameter* parameter) {
     if (parameter) {
         parameters.emplace_back(name, parameter);
-        Logger::debug("AudioParameterGroup '", groupName, "' added parameter: ", name);
+        Logger::debug("AudioParameterGroup '{}' added parameter: {}", groupName, name);
     }
 }
 
@@ -160,7 +157,7 @@ AudioParameter* AudioParameterGroup::getParameter(const std::string& name) {
             return param;
         }
     }
-    Logger::warn("AudioParameterGroup '", groupName, "' parameter not found: ", name);
+    Logger::warn("AudioParameterGroup '{}' parameter not found: {}", groupName, name);
     return nullptr;
 }
 
@@ -170,7 +167,7 @@ void AudioParameterGroup::setSampleRate(double sampleRate) {
             param->setSampleRate(sampleRate);
         }
     }
-    Logger::debug("AudioParameterGroup '", groupName, "' sample rate set to: ", sampleRate);
+    Logger::debug("AudioParameterGroup '{}' sample rate set to: {}", groupName, sampleRate);
 }
 
 void AudioParameterGroup::setAllSmoothingTime(float timeMs) {
@@ -179,5 +176,5 @@ void AudioParameterGroup::setAllSmoothingTime(float timeMs) {
             param->setSmoothingTime(timeMs);
         }
     }
-    Logger::debug("AudioParameterGroup '", groupName, "' smoothing time set to: ", timeMs, "ms");
+    Logger::debug("AudioParameterGroup '{}' smoothing time set to: {}ms", groupName, timeMs);
 }
