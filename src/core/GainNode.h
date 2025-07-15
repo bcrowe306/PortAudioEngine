@@ -9,11 +9,8 @@ public:
     GainNode(float initialGain = 1.0f, const std::string& name = "GainNode");
     
     void processCallback(
-        const float* const* inputBuffers,
-        float* const* outputBuffers,
-        int numInputChannels,
-        int numOutputChannels,
-        int numSamples,
+        choc::buffer::ChannelArrayView<const float> inputBuffers,
+        choc::buffer::ChannelArrayView<float> outputBuffers,
         double sampleRate,
         int blockSize
     ) override;

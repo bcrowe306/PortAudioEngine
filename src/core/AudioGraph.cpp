@@ -323,9 +323,8 @@ void AudioGraphProcessor::setCompiledGraph(std::shared_ptr<AudioGraph::CompiledG
 }
 
 void AudioGraphProcessor::processGraph(
-    float* const* outputBuffers,
-    int numOutputChannels,
-    int numSamples,
+    choc::buffer::ChannelArrayView<const float> inputBuffers,
+    choc::buffer::ChannelArrayView<float> outputBuffers,
     double sampleRate,
     int blockSize
 ) {
@@ -335,16 +334,17 @@ void AudioGraphProcessor::processGraph(
         graph = compiledGraph;
     }
     
+    auto numOutputChannels = outputBuffers.getNumChannels();
+    auto numSamples = outputBuffers.getNumFrames();
+    
     if (!graph || !graph->prepared || graph->instructions.empty()) {
         // Clear output buffers if no graph
-        for (int ch = 0; ch < numOutputChannels; ++ch) {
-            std::memset(outputBuffers[ch], 0, numSamples * sizeof(float));
-        }
+        outputBuffers.clear();
         return;
     }
     
     // Ensure temp buffers are sized correctly
-    ensureTempBuffersSize(graph->numTempBuffers, numOutputChannels, numSamples);
+    ensureTempBuffersSize(graph->numTempBuffers, static_cast<int>(numOutputChannels), static_cast<int>(numSamples));
     
     // Clear all temp buffers
     for (int bufferIdx = 0; bufferIdx < graph->numTempBuffers; ++bufferIdx) {
@@ -357,39 +357,79 @@ void AudioGraphProcessor::processGraph(
     for (const auto& instruction : graph->instructions) {
         if (!instruction.node) continue;
         
-        // Prepare input buffers for this node
+        // Create input buffer views for this node
         std::vector<float*> inputPtrs;
-        for (int inputIndex : instruction.inputBufferIndices) {
-            if (inputIndex < static_cast<int>(tempBufferPtrs.size())) {
-                inputPtrs.push_back(tempBufferPtrs[inputIndex]);
+        
+        // If no input connections, use the actual input buffers from PortAudio
+        if (instruction.inputBufferIndices.empty() && inputBuffers.getNumChannels() > 0) {
+            // This is an input node - use the input buffers from PortAudio
+            // For simplicity, we'll pass the input buffer as a const view
+            // The node should handle const input appropriately
+            
+            // Process with input from PortAudio
+            float* outputPtr = nullptr;
+            if (instruction.outputBufferIndex < static_cast<int>(tempBufferPtrs.size())) {
+                outputPtr = tempBufferPtrs[instruction.outputBufferIndex];
             }
-        }
-        
-        // Get output buffer for this node
-        float* outputPtr = nullptr;
-        if (instruction.outputBufferIndex < static_cast<int>(tempBufferPtrs.size())) {
-            outputPtr = tempBufferPtrs[instruction.outputBufferIndex];
-        }
-        
-        if (outputPtr) {
-            // Process the node
-            std::vector<float*> outputPtrs = {outputPtr};
-            instruction.node->processCallback(
-                inputPtrs.empty() ? nullptr : inputPtrs.data(),
-                outputPtrs.data(),
-                static_cast<int>(inputPtrs.size()),
-                1, // Single channel temp buffer
-                numSamples,
-                sampleRate,
-                blockSize
-            );
+            
+            if (outputPtr) {
+                float* outputPtrArray[] = { outputPtr };
+                auto outputView = choc::buffer::createChannelArrayView(
+                    outputPtrArray,
+                    static_cast<choc::buffer::ChannelCount>(1),
+                    static_cast<choc::buffer::FrameCount>(numSamples)
+                );
+                
+                // Process the node with input from PortAudio
+                instruction.node->processCallback(
+                    inputBuffers,  // Pass the actual input buffers
+                    outputView,
+                    sampleRate,
+                    blockSize
+                );
+            }
+        } else {
+            // This node has inputs from other nodes in the graph
+            for (int inputIndex : instruction.inputBufferIndices) {
+                if (inputIndex < static_cast<int>(tempBufferPtrs.size())) {
+                    inputPtrs.push_back(tempBufferPtrs[inputIndex]);
+                }
+            }
+            
+            // Get output buffer for this node
+            float* outputPtr = nullptr;
+            if (instruction.outputBufferIndex < static_cast<int>(tempBufferPtrs.size())) {
+                outputPtr = tempBufferPtrs[instruction.outputBufferIndex];
+            }
+            
+            if (outputPtr) {
+                // Create choc buffer views for input and output
+                auto inputView = choc::buffer::createChannelArrayView(
+                    inputPtrs.empty() ? nullptr : inputPtrs.data(),
+                    static_cast<choc::buffer::ChannelCount>(inputPtrs.size()),
+                    static_cast<choc::buffer::FrameCount>(numSamples)
+                );
+                
+                float* outputPtrArray[] = { outputPtr };
+                auto outputView = choc::buffer::createChannelArrayView(
+                    outputPtrArray,
+                    static_cast<choc::buffer::ChannelCount>(1),
+                    static_cast<choc::buffer::FrameCount>(numSamples)
+                );
+                
+                // Process the node
+                instruction.node->processCallback(
+                    inputView,
+                    outputView,
+                    sampleRate,
+                    blockSize
+                );
+            }
         }
     }
     
     // Mix output nodes to final output buffers
-    for (int ch = 0; ch < numOutputChannels; ++ch) {
-        std::memset(outputBuffers[ch], 0, numSamples * sizeof(float));
-    }
+    outputBuffers.clear();
     
     for (auto& outputNode : graph->outputNodes) {
         // Find the buffer index for this output node
@@ -399,9 +439,10 @@ void AudioGraphProcessor::processGraph(
                     float* nodeOutput = tempBufferPtrs[instruction.outputBufferIndex];
                     
                     // Mix to all output channels (mono to stereo)
-                    for (int sample = 0; sample < numSamples; ++sample) {
-                        for (int ch = 0; ch < numOutputChannels; ++ch) {
-                            outputBuffers[ch][sample] += nodeOutput[sample];
+                    for (choc::buffer::FrameCount sample = 0; sample < numSamples; ++sample) {
+                        float sampleValue = nodeOutput[sample];
+                        for (choc::buffer::ChannelCount ch = 0; ch < numOutputChannels; ++ch) {
+                            outputBuffers.getSample(ch, sample) += sampleValue;
                         }
                     }
                 }

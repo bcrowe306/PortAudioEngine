@@ -3,6 +3,7 @@
 #include <vector>
 #include <memory>
 #include <string>
+#include "../../lib/choc/audio/choc_SampleBuffers.h"
 
 class AudioNode : public std::enable_shared_from_this<AudioNode> {
 public:
@@ -18,11 +19,8 @@ public:
     // Audio processing lifecycle
     virtual void prepare(const PrepareInfo& info);
     virtual void processCallback(
-        const float* const* inputBuffers,
-        float* const* outputBuffers,
-        int numInputChannels,
-        int numOutputChannels,
-        int numSamples,
+        choc::buffer::ChannelArrayView<const float> inputBuffers,
+        choc::buffer::ChannelArrayView<float> outputBuffers,
         double sampleRate,
         int blockSize
     ) = 0;
@@ -37,6 +35,12 @@ public:
 
 protected:
     // Helper methods for derived classes
+    void copyBuffer(choc::buffer::ChannelArrayView<const float> source, choc::buffer::ChannelArrayView<float> destination);
+    void addToBuffer(choc::buffer::ChannelArrayView<const float> source, choc::buffer::ChannelArrayView<float> destination);
+    void clearBuffer(choc::buffer::ChannelArrayView<float> buffer);
+    void scaleBuffer(choc::buffer::ChannelArrayView<float> buffer, float gain);
+    
+    // Legacy helper methods for single channel operations
     void copyBuffer(const float* source, float* destination, int numSamples);
     void addToBuffer(const float* source, float* destination, int numSamples);
     void clearBuffer(float* buffer, int numSamples);

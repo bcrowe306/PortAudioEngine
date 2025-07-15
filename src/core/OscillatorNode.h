@@ -16,11 +16,8 @@ public:
     OscillatorNode(float frequency = 440.0f, WaveType waveType = WaveType::Sine, const std::string& name = "OscillatorNode");
     
     void processCallback(
-        const float* const* inputBuffers,
-        float* const* outputBuffers,
-        int numInputChannels,
-        int numOutputChannels,
-        int numSamples,
+        choc::buffer::ChannelArrayView<const float> inputBuffers,
+        choc::buffer::ChannelArrayView<float> outputBuffers,
         double sampleRate,
         int blockSize
     ) override;

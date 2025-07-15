@@ -2,6 +2,7 @@
 
 #include "AudioNode.h"
 #include "../../lib/choc/threading/choc_SpinLock.h"
+#include "../../lib/choc/audio/choc_SampleBuffers.h"
 #include <vector>
 #include <memory>
 #include <unordered_set>
@@ -97,9 +98,8 @@ public:
 
     // Process the graph (called from real-time thread)
     void processGraph(
-        float* const* outputBuffers,
-        int numOutputChannels,
-        int numSamples,
+        choc::buffer::ChannelArrayView<const float> inputBuffers,
+        choc::buffer::ChannelArrayView<float> outputBuffers,
         double sampleRate,
         int blockSize
     );

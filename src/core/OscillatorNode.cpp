@@ -11,22 +11,22 @@ OscillatorNode::OscillatorNode(float frequency, WaveType waveType, const std::st
 }
 
 void OscillatorNode::processCallback(
-    const float* const* inputBuffers,
-    float* const* outputBuffers,
-    int numInputChannels,
-    int numOutputChannels,
-    int numSamples,
+    choc::buffer::ChannelArrayView<const float> inputBuffers,
+    choc::buffer::ChannelArrayView<float> outputBuffers,
     double sampleRate,
     int blockSize
 ) {
     // Update parameter sample rate if needed
     frequencyParameter->setSampleRate(sampleRate);
     
+    auto numOutputChannels = outputBuffers.getNumChannels();
+    auto numSamples = outputBuffers.getNumFrames();
+    
     // Generate oscillator output for each channel
-    for (int outCh = 0; outCh < numOutputChannels; ++outCh) {
-        for (int sample = 0; sample < numSamples; ++sample) {
+    for (choc::buffer::ChannelCount outCh = 0; outCh < numOutputChannels; ++outCh) {
+        for (choc::buffer::FrameCount sample = 0; sample < numSamples; ++sample) {
             float currentFrequency = frequencyParameter->getNextValue();
-            outputBuffers[outCh][sample] = generateSample(currentFrequency, static_cast<float>(sampleRate));
+            outputBuffers.getSample(outCh, sample) = generateSample(currentFrequency, static_cast<float>(sampleRate));
         }
     }
 }

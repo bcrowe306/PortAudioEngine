@@ -10,31 +10,35 @@ GainNode::GainNode(float initialGain, const std::string& name)
 }
 
 void GainNode::processCallback(
-    const float* const* inputBuffers,
-    float* const* outputBuffers,
-    int numInputChannels,
-    int numOutputChannels,
-    int numSamples,
+    choc::buffer::ChannelArrayView<const float> inputBuffers,
+    choc::buffer::ChannelArrayView<float> outputBuffers,
     double sampleRate,
     int blockSize
 ) {
     // Update parameter sample rate if needed
     gainParameter->setSampleRate(sampleRate);
     
+    auto numOutputChannels = outputBuffers.getNumChannels();
+    auto numInputChannels = inputBuffers.getNumChannels();
+    auto numSamples = outputBuffers.getNumFrames();
+    
     // Process each output channel
-    for (int outCh = 0; outCh < numOutputChannels; ++outCh) {
-        if (outCh < numInputChannels && inputBuffers[outCh]) {
+    for (choc::buffer::ChannelCount outCh = 0; outCh < numOutputChannels; ++outCh) {
+        if (outCh < numInputChannels) {
             // Apply gain with per-sample smoothing
-            for (int sample = 0; sample < numSamples; ++sample) {
+            for (choc::buffer::FrameCount sample = 0; sample < numSamples; ++sample) {
                 float currentGain = gainParameter->getNextValue();
-                outputBuffers[outCh][sample] = inputBuffers[outCh][sample] * currentGain;
+                outputBuffers.getSample(outCh, sample) = inputBuffers.getSample(outCh, sample) * currentGain;
             }
         } else {
             // No input for this channel, but still advance the parameter
-            for (int sample = 0; sample < numSamples; ++sample) {
+            for (choc::buffer::FrameCount sample = 0; sample < numSamples; ++sample) {
                 gainParameter->getNextValue();
             }
-            clearBuffer(outputBuffers[outCh], numSamples);
+            // Clear output for this channel
+            for (choc::buffer::FrameCount sample = 0; sample < numSamples; ++sample) {
+                outputBuffers.getSample(outCh, sample) = 0.0f;
+            }
         }
     }
 }

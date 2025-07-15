@@ -15,8 +15,6 @@ add_library(audio_core STATIC
     ${CMAKE_CURRENT_SOURCE_DIR}/LevelsNode.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/AnalyzerNode.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/PlayheadNode.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/ADSRNode.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/FilterNode.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/MidiEngine.cpp
 )
 

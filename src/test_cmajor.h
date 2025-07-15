@@ -18,19 +18,31 @@ public:
     }
 
     void processCallback(
-        const float* const* inputBuffers,
-        float* const* outputBuffers,
-        int numInputChannels,
-        int numOutputChannels,
-        int numSamples,
+        choc::buffer::ChannelArrayView<const float> inputBuffers,
+        choc::buffer::ChannelArrayView<float> outputBuffers,
         double sampleRate,
         int blockSize
     ) override {
+        auto numSamples = outputBuffers.getNumFrames();
+        auto numOutputChannels = outputBuffers.getNumChannels();
+        
         // if (bypassed || !prepared) return;
-        sine_generator.advance(numSamples);
-        sine_generator.copyOutputFrames(
-            sine_generator.getEndpointHandleForName("out"), outputBuffers[0],
-            numSamples);
+        sine_generator.advance(static_cast<int>(numSamples));
+        
+        if (numOutputChannels > 0) {
+            // Get a temporary buffer for the first channel
+            std::vector<float> tempBuffer(numSamples);
+            sine_generator.copyOutputFrames(
+                sine_generator.getEndpointHandleForName("out"), tempBuffer.data(),
+                static_cast<int>(numSamples));
+            
+            // Copy to all output channels
+            for (choc::buffer::ChannelCount ch = 0; ch < numOutputChannels; ++ch) {
+                for (choc::buffer::FrameCount frame = 0; frame < numSamples; ++frame) {
+                    outputBuffers.getSample(ch, frame) = tempBuffer[frame];
+                }
+            }
+        }
     }
 
 };

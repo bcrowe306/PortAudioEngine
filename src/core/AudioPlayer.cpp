@@ -8,18 +8,16 @@ AudioPlayer::AudioPlayer(const std::string& name) : AudioNode(name) {
 }
 
 void AudioPlayer::processCallback(
-    const float* const* inputBuffers,
-    float* const* outputBuffers,
-    int numInputChannels,
-    int numOutputChannels,
-    int numSamples,
+    choc::buffer::ChannelArrayView<const float> inputBuffers,
+    choc::buffer::ChannelArrayView<float> outputBuffers,
     double sampleRate,
     int blockSize) 
 {
+    auto numOutputChannels = outputBuffers.getNumChannels();
+    auto numSamples = outputBuffers.getNumFrames();
+    
     // Clear all output buffers first
-    for (int ch = 0; ch < numOutputChannels; ++ch) {
-        std::memset(outputBuffers[ch], 0, numSamples * sizeof(float));
-    }
+    outputBuffers.clear();
     
     if (!playing.load() || audioData.getSize().isEmpty()) {
         return;
@@ -27,9 +25,9 @@ void AudioPlayer::processCallback(
     
     size_t currentPos = playPosition.load();
     size_t dataSize = audioData.getNumFrames();
-    int audioChannels = static_cast<int>(audioData.getNumChannels());
+    auto audioChannels = audioData.getNumChannels();
     
-    for (int sample = 0; sample < numSamples; ++sample) {
+    for (choc::buffer::FrameCount sample = 0; sample < numSamples; ++sample) {
         if (currentPos >= endPosition.load()) {
             if (loop) {
                 currentPos = startPosition.load(); // Loop back to start position
@@ -42,7 +40,7 @@ void AudioPlayer::processCallback(
         
         if (currentPos < dataSize) {
             // Process each output channel
-            for (int outCh = 0; outCh < numOutputChannels; ++outCh) {
+            for (choc::buffer::ChannelCount outCh = 0; outCh < numOutputChannels; ++outCh) {
                 float sampleValue = 0.0f;
                 
                 if (audioChannels == 1) {
@@ -50,12 +48,11 @@ void AudioPlayer::processCallback(
                     sampleValue = audioData.getSample(0, static_cast<choc::buffer::FrameCount>(currentPos));
                 } else {
                     // Multi-channel: map audio channels to output channels
-                    int audioCh = outCh % audioChannels; // Wrap around if more output channels than audio channels
-                    sampleValue = audioData.getSample(static_cast<choc::buffer::ChannelCount>(audioCh), 
-                                                     static_cast<choc::buffer::FrameCount>(currentPos));
+                    auto audioCh = outCh % audioChannels; // Wrap around if more output channels than audio channels
+                    sampleValue = audioData.getSample(audioCh, static_cast<choc::buffer::FrameCount>(currentPos));
                 }
                 
-                outputBuffers[outCh][sample] = sampleValue * gain;
+                outputBuffers.getSample(outCh, sample) = sampleValue * gain;
             }
             
             currentPos++;

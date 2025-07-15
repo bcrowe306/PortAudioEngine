@@ -22,11 +22,8 @@ public:
     void prepare(const PrepareInfo& info) override;
     
     void processCallback(
-        const float* const* inputBuffers,
-        float* const* outputBuffers,
-        int numInputChannels,
-        int numOutputChannels,
-        int numSamples,
+        choc::buffer::ChannelArrayView<const float> inputBuffers,
+        choc::buffer::ChannelArrayView<float> outputBuffers,
         double sampleRate,
         int blockSize
     ) override;

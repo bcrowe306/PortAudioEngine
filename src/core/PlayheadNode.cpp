@@ -11,14 +11,13 @@ void PlayheadNode::prepare(const PrepareInfo& info) {
 }
 
 void PlayheadNode::processCallback(
-    const float* const* inputBuffers,
-    float* const* outputBuffers,
-    int numInputChannels,
-    int numOutputChannels,
-    int numSamples,
+    choc::buffer::ChannelArrayView<const float> inputBuffers,
+    choc::buffer::ChannelArrayView<float> outputBuffers,
     double sampleRate,
     int blockSize
 ) {
+    auto numSamples = outputBuffers.getNumFrames();
+    
     // Check for pending position updates (from non-real-time thread)
     if (positionUpdateFlag.load()) {
         songPosition = pendingPosition;
@@ -35,7 +34,7 @@ void PlayheadNode::processCallback(
         int prevBar = songPosition.currentBar;
         
         // Process each sample in the buffer to ensure precise timing
-        for (int sample = 0; sample < numSamples; ++sample) {
+        for (choc::buffer::FrameCount sample = 0; sample < numSamples; ++sample) {
             // Advance position by one sample
             songPosition.songPositionInSamples++;
             
@@ -81,7 +80,7 @@ void PlayheadNode::processCallback(
     
     // This node doesn't produce audio output, just timing information
     // Clear output buffers if any are provided
-    
+    outputBuffers.clear();
 }
 
 void PlayheadNode::play() {

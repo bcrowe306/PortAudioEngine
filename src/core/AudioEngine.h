@@ -5,6 +5,9 @@
 #include <string>
 #include <memory>
 #include "AudioGraph.h"
+#include "AudioNode.h"
+#include "../../lib/choc/audio/choc_SampleBuffers.h"
+#include "../../lib/choc/audio/choc_AudioFileFormat_WAV.h"
 
 class AudioEngine {
 public:
@@ -47,6 +50,30 @@ public:
     // Device utilities
     int getDefaultOutputDeviceIndex() const;
     int getDefaultInputDeviceIndex() const;
+
+    // Offline rendering
+    struct OfflineRenderParams {
+        std::string outputFilePath;
+        
+        // Render length (choose one)
+        int lengthInSamples = 0;           // Direct sample count
+        double lengthInSeconds = 0.0;      // Time in seconds
+        int lengthInTicks = 0;             // Musical time in ticks
+        double tempoBeatsPerMinute = 120.0; // BPM for tick calculation
+        int ticksPerQuarterNote = 480;     // TPQN for tick calculation
+        
+        // Rendering options
+        std::shared_ptr<AudioNode> sourceNode = nullptr; // Start from specific node, nullptr = whole graph
+        double renderSampleRate = 44100.0; // Sample rate for offline render
+        int renderBufferSize = 1024;       // Buffer size for processing chunks
+        bool includeInput = false;         // Whether to include input buffers (silent for offline)
+    };
+    
+    // Perform offline render
+    bool renderOffline(const OfflineRenderParams& params);
+    
+    // Helper to calculate samples from different time units
+    static int calculateSamplesFromParams(const OfflineRenderParams& params);
 
 private:
     static int paCallback(

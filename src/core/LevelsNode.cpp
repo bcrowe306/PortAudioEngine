@@ -9,31 +9,22 @@ LevelsNode::LevelsNode(const std::string& name) : AudioNode(name) {
 }
 
 void LevelsNode::processCallback(
-    const float* const* inputBuffers,
-    float* const* outputBuffers,
-    int numInputChannels,
-    int numOutputChannels,
-    int numSamples,
+    choc::buffer::ChannelArrayView<const float> inputBuffers,
+    choc::buffer::ChannelArrayView<float> outputBuffers,
     double sampleRate,
     int blockSize
 ) {
-    // Pass through audio (this is an analyzer, not an effect)
-    if (numInputChannels >= 1 && numOutputChannels >= 1) {
-        copyBuffer(inputBuffers[0], outputBuffers[0], numSamples);
-    }
-    if (numInputChannels >= 2 && numOutputChannels >= 2) {
-        copyBuffer(inputBuffers[1], outputBuffers[1], numSamples);
-    }
+    auto numInputChannels = inputBuffers.getNumChannels();
+    auto numOutputChannels = outputBuffers.getNumChannels();
+    auto numSamples = outputBuffers.getNumFrames();
     
-    // Clear any additional output channels
-    for (int ch = numInputChannels; ch < numOutputChannels; ++ch) {
-        clearBuffer(outputBuffers[ch], numSamples);
-    }
+    // Pass through audio (this is an analyzer, not an effect)
+    copyBuffer(inputBuffers, outputBuffers);
     
     // Analyze levels
-    for (int i = 0; i < numSamples; ++i) {
-        float leftSample = (numInputChannels >= 1) ? inputBuffers[0][i] : 0.0f;
-        float rightSample = (numInputChannels >= 2) ? inputBuffers[1][i] : leftSample;
+    for (choc::buffer::FrameCount i = 0; i < numSamples; ++i) {
+        float leftSample = (numInputChannels >= 1) ? inputBuffers.getSample(0, i) : 0.0f;
+        float rightSample = (numInputChannels >= 2) ? inputBuffers.getSample(1, i) : leftSample;
         
         updatePeaks(leftSample, rightSample);
         updateRMS(leftSample, rightSample);

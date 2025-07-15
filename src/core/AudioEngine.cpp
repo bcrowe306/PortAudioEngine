@@ -218,51 +218,265 @@ int AudioEngine::paCallback(
     if (outputBuffer && engine->processor && engine->outputChannels > 0) {
         // Convert PortAudio interleaved buffer to separate channel pointers
         float* interleavedOutput = static_cast<float*>(outputBuffer);
+        const float* interleavedInput = static_cast<const float*>(inputBuffer);
         
-        // Use actual output channel count
-        const int numChannels = engine->outputChannels;
+        // Use actual channel counts
+        const int numOutputChannels = engine->outputChannels;
+        const int numInputChannels = engine->inputChannels;
         const int numSamples = static_cast<int>(framesPerBuffer);
         
-        // Create temporary deinterleaved buffers
-        std::vector<std::vector<float>> channelBuffers(numChannels);
-        std::vector<float*> channelPtrs(numChannels);
+        // Create owned input buffer (ChannelArrayBuffer)
+        choc::buffer::ChannelArrayBuffer<float> inputChannelBuffer(
+            static_cast<choc::buffer::ChannelCount>(numInputChannels), 
+            static_cast<choc::buffer::FrameCount>(numSamples)
+        );
         
-        for (int ch = 0; ch < numChannels; ++ch) {
-            channelBuffers[ch].resize(numSamples);
-            channelPtrs[ch] = channelBuffers[ch].data();
+        // Create owned output buffer (ChannelArrayBuffer)
+        choc::buffer::ChannelArrayBuffer<float> outputChannelBuffer(
+            static_cast<choc::buffer::ChannelCount>(numOutputChannels), 
+            static_cast<choc::buffer::FrameCount>(numSamples)
+        );
+        
+        // Convert interleaved input to deinterleaved input buffer
+        if (interleavedInput && numInputChannels > 0) {
+            for (int sample = 0; sample < numSamples; ++sample) {
+                for (int ch = 0; ch < numInputChannels; ++ch) {
+                    inputChannelBuffer.getSample(static_cast<choc::buffer::ChannelCount>(ch), 
+                                               static_cast<choc::buffer::FrameCount>(sample)) = 
+                        interleavedInput[sample * numInputChannels + ch];
+                }
+            }
         }
         
-        // Process the audio graph
+        // Process the audio graph with both input and output buffers
         engine->processor->processGraph(
-            channelPtrs.data(),
-            numChannels,
-            numSamples,
+            inputChannelBuffer.getView(),
+            outputChannelBuffer.getView(),
             engine->sampleRate,
             numSamples
         );
         
         // Convert back to interleaved format
         for (int sample = 0; sample < numSamples; ++sample) {
-            for (int ch = 0; ch < numChannels; ++ch) {
-                interleavedOutput[sample * numChannels + ch] = channelBuffers[ch][sample];
+            for (int ch = 0; ch < numOutputChannels; ++ch) {
+                interleavedOutput[sample * numOutputChannels + ch] = 
+                    outputChannelBuffer.getSample(static_cast<choc::buffer::ChannelCount>(ch), 
+                                                static_cast<choc::buffer::FrameCount>(sample));
             }
         }
         
-        // Debug: Check if we have audio
-        static int audioDebugCount = 0;
-        if (audioDebugCount < 2) {
-            std::cout << "Audio callback - channels: " << numChannels 
-                      << ", first sample: " << channelBuffers[0][0];
-            if (numChannels > 1) {
-                std::cout << ", " << channelBuffers[1][0];
-            }
-            std::cout << std::endl;
-            audioDebugCount++;
-        }
     } else if (outputBuffer && engine->outputChannels > 0) {
         // Fallback: just zero the output
         std::memset(outputBuffer, 0, framesPerBuffer * sizeof(float) * engine->outputChannels);
     }
     
     return paContinue;
+}
+
+// Offline rendering implementation
+bool AudioEngine::renderOffline(const OfflineRenderParams& params) {
+    if (params.outputFilePath.empty()) {
+        std::cerr << "Error: Output file path is required for offline rendering" << std::endl;
+        return false;
+    }
+    
+    // Calculate total samples to render
+    int totalSamples = calculateSamplesFromParams(params);
+    if (totalSamples <= 0) {
+        std::cerr << "Error: Invalid render length specified" << std::endl;
+        return false;
+    }
+    
+    std::cout << "Starting offline render: " << totalSamples << " samples at " 
+              << params.renderSampleRate << " Hz" << std::endl;
+    
+    // Prepare audio graph for offline rendering
+    if (!audioGraph) {
+        std::cerr << "Error: No audio graph available for rendering" << std::endl;
+        return false;
+    }
+    
+    // Store current state to restore later
+    double originalSampleRate = sampleRate;
+    int originalBufferSize = bufferSize;
+    int originalOutputChannels = outputChannels;
+    int originalInputChannels = inputChannels;
+    
+    // Set up for offline rendering
+    sampleRate = params.renderSampleRate;
+    bufferSize = params.renderBufferSize;
+    // Keep existing channel configuration or use defaults
+    if (outputChannels == 0) outputChannels = 2; // Default to stereo
+    
+    // Prepare the audio graph with offline settings
+    AudioNode::PrepareInfo prepareInfo;
+    prepareInfo.sampleRate = sampleRate;
+    prepareInfo.maxBufferSize = bufferSize;
+    prepareInfo.numChannels = outputChannels;
+    
+    audioGraph->prepare(prepareInfo);
+    
+    // Create processor for offline rendering
+    auto offlineProcessor = std::make_unique<AudioGraphProcessor>();
+    auto compiledGraph = audioGraph->getCompiledGraph();
+    if (!compiledGraph) {
+        std::cerr << "Error: Failed to compile audio graph for offline rendering" << std::endl;
+        goto cleanup;
+    }
+    offlineProcessor->setCompiledGraph(compiledGraph);
+    
+    try {
+        // Create output buffer for entire render
+        choc::buffer::ChannelArrayBuffer<float> fullOutputBuffer(
+            static_cast<choc::buffer::ChannelCount>(outputChannels),
+            static_cast<choc::buffer::FrameCount>(totalSamples)
+        );
+        
+        // Create input buffer (silent for offline rendering unless specified)
+        choc::buffer::ChannelArrayBuffer<float> inputBuffer(
+            static_cast<choc::buffer::ChannelCount>(params.includeInput ? inputChannels : 0),
+            static_cast<choc::buffer::FrameCount>(bufferSize)
+        );
+        if (params.includeInput) {
+            inputBuffer.clear(); // Fill with silence
+        }
+        
+        // Create empty input buffer for when no input is needed
+        choc::buffer::ChannelArrayBuffer<float> emptyInputBuffer(
+            static_cast<choc::buffer::ChannelCount>(0),
+            static_cast<choc::buffer::FrameCount>(bufferSize)
+        );
+        
+        // Process in chunks
+        int samplesRendered = 0;
+        while (samplesRendered < totalSamples) {
+            int samplesThisChunk = std::min(bufferSize, totalSamples - samplesRendered);
+            
+            // Create output buffer view for this chunk
+            auto outputChunkView = fullOutputBuffer.getView().getFrameRange(
+                {static_cast<choc::buffer::FrameCount>(samplesRendered), 
+                 static_cast<choc::buffer::FrameCount>(samplesRendered + samplesThisChunk)}
+            );
+            
+            // Create input buffer view for this chunk (if using input)
+            choc::buffer::ChannelArrayView<const float> inputChunkView;
+            if (params.includeInput && inputChannels > 0) {
+                // Resize input buffer if needed for this chunk
+                if (inputBuffer.getNumFrames() != static_cast<choc::buffer::FrameCount>(samplesThisChunk)) {
+                    inputBuffer.resize({static_cast<choc::buffer::ChannelCount>(inputChannels), 
+                                       static_cast<choc::buffer::FrameCount>(samplesThisChunk)});
+                    inputBuffer.clear();
+                }
+                inputChunkView = inputBuffer.getView();
+            } else {
+                // Use the empty input buffer, resizing if needed
+                if (emptyInputBuffer.getNumFrames() != static_cast<choc::buffer::FrameCount>(samplesThisChunk)) {
+                    emptyInputBuffer.resize({static_cast<choc::buffer::ChannelCount>(0),
+                                           static_cast<choc::buffer::FrameCount>(samplesThisChunk)});
+                }
+                inputChunkView = emptyInputBuffer.getView();
+            }
+            
+            // Process this chunk
+            if (params.sourceNode) {
+                // Render from specific node
+                params.sourceNode->processCallback(
+                    inputChunkView,
+                    outputChunkView,
+                    sampleRate,
+                    samplesThisChunk
+                );
+            } else {
+                // Render entire graph
+                offlineProcessor->processGraph(
+                    inputChunkView,
+                    outputChunkView,
+                    sampleRate,
+                    samplesThisChunk
+                );
+            }
+            
+            samplesRendered += samplesThisChunk;
+            
+            // Progress indicator
+            if (samplesRendered % (totalSamples / 10) == 0) {
+                int progress = (samplesRendered * 100) / totalSamples;
+                std::cout << "Rendering progress: " << progress << "%" << std::endl;
+            }
+        }
+        
+        // Write to WAV file
+        choc::audio::WAVAudioFileFormat<true> wavFormat; // Set to true to enable writing
+        
+        choc::audio::AudioFileProperties fileProps;
+        fileProps.sampleRate = params.renderSampleRate;
+        fileProps.numChannels = outputChannels;
+        fileProps.bitDepth = choc::audio::BitDepth::float32; // Use 32-bit float
+        
+        auto writer = wavFormat.createWriter(params.outputFilePath, fileProps);
+        if (!writer) {
+            std::cerr << "Error: Failed to create WAV writer for: " << params.outputFilePath << std::endl;
+            goto cleanup;
+        }
+        
+        if (!writer->appendFrames(fullOutputBuffer.getView())) {
+            std::cerr << "Error: Failed to write audio data to file" << std::endl;
+            goto cleanup;
+        }
+        
+        std::cout << "Offline render completed successfully: " << params.outputFilePath << std::endl;
+        std::cout << "Rendered " << totalSamples << " samples (" 
+                  << (totalSamples / params.renderSampleRate) << " seconds)" << std::endl;
+        
+        // Restore original state
+        sampleRate = originalSampleRate;
+        bufferSize = originalBufferSize;
+        outputChannels = originalOutputChannels;
+        inputChannels = originalInputChannels;
+        
+        // Re-prepare with original settings if we had a real-time session
+        if (originalSampleRate > 0 && originalBufferSize > 0) {
+            prepareAudioGraph();
+        }
+        
+        return true;
+        
+    } catch (const std::exception& e) {
+        std::cerr << "Error during offline rendering: " << e.what() << std::endl;
+        goto cleanup;
+    }
+    
+cleanup:
+    // Restore original state
+    sampleRate = originalSampleRate;
+    bufferSize = originalBufferSize;
+    outputChannels = originalOutputChannels;
+    inputChannels = originalInputChannels;
+    
+    // Re-prepare with original settings if we had a real-time session
+    if (originalSampleRate > 0 && originalBufferSize > 0) {
+        prepareAudioGraph();
+    }
+    
+    return false;
+}
+
+int AudioEngine::calculateSamplesFromParams(const OfflineRenderParams& params) {
+    // Priority: samples > seconds > ticks
+    if (params.lengthInSamples > 0) {
+        return params.lengthInSamples;
+    }
+    
+    if (params.lengthInSeconds > 0.0) {
+        return static_cast<int>(params.lengthInSeconds * params.renderSampleRate);
+    }
+    
+    if (params.lengthInTicks > 0) {
+        // Convert ticks to seconds: ticks / (TPQN * BPM / 60)
+        double secondsPerTick = 60.0 / (params.tempoBeatsPerMinute * params.ticksPerQuarterNote);
+        double totalSeconds = params.lengthInTicks * secondsPerTick;
+        return static_cast<int>(totalSeconds * params.renderSampleRate);
+    }
+    
+    return 0; // Invalid parameters
 }

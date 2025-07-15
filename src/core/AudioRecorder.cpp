@@ -28,37 +28,35 @@ void AudioRecorder::prepare(const PrepareInfo& info) {
 }
 
 void AudioRecorder::processCallback(
-    const float* const* inputBuffers,
-    float* const* outputBuffers,
-    int numInputChannels,
-    int numOutputChannels,
-    int numSamples,
+    choc::buffer::ChannelArrayView<const float> inputBuffers,
+    choc::buffer::ChannelArrayView<float> outputBuffers,
     double sampleRate,
     int blockSize
 ) {
+    auto numInputChannels = inputBuffers.getNumChannels();
+    auto numOutputChannels = outputBuffers.getNumChannels();
+    auto numSamples = outputBuffers.getNumFrames();
+    
     // Pass input through to output (if connected)
-    for (int outCh = 0; outCh < numOutputChannels; ++outCh) {
-        if (outCh < numInputChannels && inputBuffers[outCh]) {
-            // Copy input to output
-            std::memcpy(outputBuffers[outCh], inputBuffers[outCh], numSamples * sizeof(float));
-        } else {
-            // Clear output if no input
-            std::memset(outputBuffers[outCh], 0, numSamples * sizeof(float));
-        }
+    if (numInputChannels > 0 && numOutputChannels > 0) {
+        copyBuffer(inputBuffers, outputBuffers);
+    } else {
+        outputBuffers.clear();
     }
     
     // Record input data if recording is active
-    if (recording.load() && numInputChannels > 0 && inputBuffers[0]) {
+    if (recording.load() && numInputChannels > 0) {
         // For simplicity, record only the first channel
         // Push samples one by one using CHOC FIFO
-        for (int i = 0; i < numSamples; ++i) {
-            if (fifo->push(inputBuffers[0][i])) {
+        for (choc::buffer::FrameCount i = 0; i < numSamples; ++i) {
+            float sample = inputBuffers.getSample(0, i);
+            if (fifo->push(sample)) {
                 totalSamplesRecorded.fetch_add(1);
                 
                 // Also store in memory for playback testing
                 {
                     std::lock_guard<std::mutex> lock(recordedDataMutex);
-                    recordedData.push_back(inputBuffers[0][i]);
+                    recordedData.push_back(sample);
                 }
             } else {
                 // FIFO full, could log warning or implement overflow handling

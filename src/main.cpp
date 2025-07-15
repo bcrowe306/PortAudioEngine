@@ -4,6 +4,7 @@
 #include "core/AudioCore.h"
 #include "audio/choc_AudioFileFormat_WAV.h"
 #include "test_cmajor.h"
+#include "OfflineRenderExamples.h"
 
 int main(int, char**){
 
@@ -11,7 +12,7 @@ int main(int, char**){
     std::cout << "========================================================\n\n";
 
 
-    std::string fileName = "/Users/bcrowe/Documents/Audio Samples/DECAP - "
+    std::string fileName = "/Users/brandoncrowe/Documents/Audio Samples/DECAP - "
                             "Drums That Knock X/Hihats/DECAP hihat chonky.wav";
     std::cout << "Creating AudioEngine...\n";
     AudioEngine audioEngine;
@@ -34,7 +35,6 @@ int main(int, char**){
     graph->addOutputNode(sine);
     
     player->play();
-
 
     std::cout << "Creating MidiEngine...\n";
     MidiEngine midiEngine;

@@ -12,6 +12,4 @@
 #include "LevelsNode.h"
 #include "AnalyzerNode.h"
 #include "PlayheadNode.h"
-#include "ADSRNode.h"
-#include "FilterNode.h"
 #include "MidiEngine.h"
