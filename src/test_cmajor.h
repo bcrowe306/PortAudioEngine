@@ -1,20 +1,23 @@
 #include "core/AudioCore.h"
-#include "test.h"
+#include "osc.h"
 #include <iostream>
+#include "core/Logger.h"
 
 class CmajorTest : public AudioNode {
 public:
 
-    sine sine_generator;
+    OSC osc_generator;
     CmajorTest(const std::string& name = "CmajorTest") : AudioNode(name) {
-        sine_generator.initialise(1, 44100.0);
+        
     }
 
     void prepare(const PrepareInfo &info) override {
-        std::cout << "CmajorTest::prepare() called with sample rate: " << info.sampleRate << std::endl;
+        Logger::info("CmajorTest::prepare() called with sample rate: " + std::to_string(info.sampleRate));
         currentPrepareInfo = info;
         prepared = true;
-        sine_generator.initialise(1, info.sampleRate);
+        osc_generator.initialise(1, info.sampleRate);
+        float frequency = 440.0f; // Default frequency
+        osc_generator.setValue(osc_generator.getEndpointHandleForName("frequency"), &frequency, 0.0f);
     }
 
     void processCallback(
@@ -27,13 +30,12 @@ public:
         auto numOutputChannels = outputBuffers.getNumChannels();
         
         // if (bypassed || !prepared) return;
-        sine_generator.advance(static_cast<int>(numSamples));
         
         if (numOutputChannels > 0) {
             // Get a temporary buffer for the first channel
             std::vector<float> tempBuffer(numSamples);
-            sine_generator.copyOutputFrames(
-                sine_generator.getEndpointHandleForName("out"), tempBuffer.data(),
+            osc_generator.copyOutputFrames(
+                osc_generator.getEndpointHandleForName("out"), tempBuffer.data(),
                 static_cast<int>(numSamples));
             
             // Copy to all output channels
@@ -43,6 +45,7 @@ public:
                 }
             }
         }
+        osc_generator.advance(static_cast<int>(numSamples));
     }
 
 };

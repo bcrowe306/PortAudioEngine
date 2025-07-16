@@ -517,7 +517,7 @@ void MidiEngine::rtMidiInputCallback(double timeStamp, std::vector<unsigned char
 void MidiEngine::handleMidiInput(double timeStamp, const std::vector<unsigned char>& rawMessage, 
                                 const std::string& deviceName, unsigned int deviceIndex) {
     // Convert raw MIDI to CHOC message
-    Logger::debug("Received MIDI input from '{}' at time {}", deviceName, timeStamp);
+    // Logger::debug("Received MIDI input from '{}' at time {}", deviceName, timeStamp);
     if (rawMessage.empty()) {
         return;
     }
@@ -538,8 +538,8 @@ void MidiEngine::handleMidiInput(double timeStamp, const std::vector<unsigned ch
             }
         }
         
-        Logger::debug("MIDI input from '", deviceName, "': ", 
-                     rawMessage.size(), " bytes, handled=", handled);
+        // Logger::debug("MIDI input from '", deviceName, "': ", 
+        //              rawMessage.size(), " bytes, handled=", handled);
         
     } catch (const std::exception& e) {
         Logger::error("Error processing MIDI input from '", deviceName, "': ", e.what());

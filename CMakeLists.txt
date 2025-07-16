@@ -53,3 +53,33 @@ if(APPLE)
     "-framework IOKit"
   )
 endif()
+
+# Add test executable for SamplePlayerNode
+add_executable(test_sample_player
+    ${CMAKE_SOURCE_DIR}/test_sample_player.cpp
+)
+
+target_link_libraries(test_sample_player PRIVATE audio_core)
+target_link_libraries(test_sample_player PRIVATE fmt::fmt)
+target_link_libraries(test_sample_player PRIVATE spdlog::spdlog_header_only)
+
+target_include_directories(test_sample_player PRIVATE
+    ${CMAKE_SOURCE_DIR}/lib/concurrentqueue
+    ${CMAKE_SOURCE_DIR}/lib/choc
+    ${CMAKE_SOURCE_DIR}
+)
+
+# Add test executable for PolyphonicSampler
+add_executable(test_polyphonic_sampler
+    ${CMAKE_SOURCE_DIR}/test_polyphonic_sampler.cpp
+)
+
+target_link_libraries(test_polyphonic_sampler PRIVATE audio_core)
+target_link_libraries(test_polyphonic_sampler PRIVATE fmt::fmt)
+target_link_libraries(test_polyphonic_sampler PRIVATE spdlog::spdlog_header_only)
+
+target_include_directories(test_polyphonic_sampler PRIVATE
+    ${CMAKE_SOURCE_DIR}/lib/concurrentqueue
+    ${CMAKE_SOURCE_DIR}/lib/choc
+    ${CMAKE_SOURCE_DIR}
+)

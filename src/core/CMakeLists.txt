@@ -16,6 +16,10 @@ add_library(audio_core STATIC
     ${CMAKE_CURRENT_SOURCE_DIR}/AnalyzerNode.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/PlayheadNode.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/MidiEngine.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/VoiceAllocator.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/SamplePlayerNode.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/PolyphonicSampler.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/ADSR.cpp
 )
 
 #  PortAudio

@@ -121,11 +121,11 @@ void AudioPlayer::loadData(const float* const* channelData, int numChannels, int
 }
 
 void AudioPlayer::play() {
-    Logger::debug("AudioPlayer::play() called - dataSize: ", audioData.getNumFrames());
+    // Logger::debug("AudioPlayer::play() called - dataSize: ", audioData.getNumFrames());
     if (!audioData.getSize().isEmpty()) {
         playing.store(true);
         playPosition.store(startPosition.load()); // Reset position to start
-        Logger::debug("  Playing flag set to true");
+        // Logger::debug("  Playing flag set to true");
     } else {
         Logger::warn("AudioPlayer::play() called but no data to play!");
     }
