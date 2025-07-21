@@ -23,6 +23,22 @@ AudioEngine::~AudioEngine() {
     Pa_Terminate();
 }
 
+void AudioEngine::ensureCallbackBuffersSize(int inputChannels, int outputChannels, int bufferSize) {
+    // Resize input buffer if needed
+    auto requiredInputSize = choc::buffer::Size::create(static_cast<choc::buffer::ChannelCount>(inputChannels), 
+                                                       static_cast<choc::buffer::FrameCount>(bufferSize));
+    if (callbackInputBuffer.getSize() != requiredInputSize) {
+        callbackInputBuffer.resize(requiredInputSize);
+    }
+    
+    // Resize output buffer if needed  
+    auto requiredOutputSize = choc::buffer::Size::create(static_cast<choc::buffer::ChannelCount>(outputChannels), 
+                                                        static_cast<choc::buffer::FrameCount>(bufferSize));
+    if (callbackOutputBuffer.getSize() != requiredOutputSize) {
+        callbackOutputBuffer.resize(requiredOutputSize);
+    }
+}
+
 void AudioEngine::enumerateDevices() {
     int numDevices = Pa_GetDeviceCount();
     if (numDevices < 0) {
@@ -114,6 +130,9 @@ void AudioEngine::startStream(int inputDeviceIndex, int outputDeviceIndex, int b
         throw std::runtime_error("Failed to start PortAudio stream");
     }
     
+    // Ensure callback buffers are properly sized
+    ensureCallbackBuffersSize(inputChannels, outputChannels, bufferSize);
+    
     // Prepare the audio graph system
     prepareAudioGraph();
 }
@@ -140,10 +159,39 @@ bool AudioEngine::isStreamActive() const {
 
 void AudioEngine::setBufferSize(int bufferSize_) {
     bufferSize = bufferSize_;
+    // Update callback buffers if stream is active
+    if (isStreamActive()) {
+        ensureCallbackBuffersSize(inputChannels, outputChannels, bufferSize);
+    }
 }
 
 void AudioEngine::setSampleRate(double sampleRate_) {
     sampleRate = sampleRate_;
+}
+
+void AudioEngine::setInputChannels(int channels) {
+    inputChannels = channels;
+    // Update callback buffers if stream is active
+    if (isStreamActive() && bufferSize > 0) {
+        ensureCallbackBuffersSize(inputChannels, outputChannels, bufferSize);
+    }
+}
+
+void AudioEngine::setOutputChannels(int channels) {
+    outputChannels = channels;
+    // Update callback buffers if stream is active
+    if (isStreamActive() && bufferSize > 0) {
+        ensureCallbackBuffersSize(inputChannels, outputChannels, bufferSize);
+    }
+}
+
+void AudioEngine::setChannels(int input, int output) {
+    inputChannels = input;
+    outputChannels = output;
+    // Update callback buffers if stream is active
+    if (isStreamActive() && bufferSize > 0) {
+        ensureCallbackBuffersSize(inputChannels, outputChannels, bufferSize);
+    }
 }
 
 // TODO:Fix Implement audio graph preparation
@@ -226,33 +274,36 @@ int AudioEngine::paCallback(
         const int numInputChannels = engine->inputChannels;
         const int numSamples = static_cast<int>(framesPerBuffer);
         
-        // Create owned input buffer (ChannelArrayBuffer)
-        choc::buffer::ChannelArrayBuffer<float> inputChannelBuffer(
-            static_cast<choc::buffer::ChannelCount>(numInputChannels), 
-            static_cast<choc::buffer::FrameCount>(numSamples)
-        );
+        // Ensure buffers are properly sized (only resize if needed - should be rare after stream start)
+        if (engine->callbackOutputBuffer.getNumFrames() != static_cast<choc::buffer::FrameCount>(numSamples) ||
+            engine->callbackOutputBuffer.getNumChannels() != static_cast<choc::buffer::ChannelCount>(numOutputChannels) ||
+            (numInputChannels > 0 && 
+             (engine->callbackInputBuffer.getNumFrames() != static_cast<choc::buffer::FrameCount>(numSamples) ||
+              engine->callbackInputBuffer.getNumChannels() != static_cast<choc::buffer::ChannelCount>(numInputChannels)))) {
+            engine->ensureCallbackBuffersSize(numInputChannels, numOutputChannels, numSamples);
+        }
         
-        // Create owned output buffer (ChannelArrayBuffer)
-        choc::buffer::ChannelArrayBuffer<float> outputChannelBuffer(
-            static_cast<choc::buffer::ChannelCount>(numOutputChannels), 
-            static_cast<choc::buffer::FrameCount>(numSamples)
-        );
+        // Clear the output buffer
+        engine->callbackOutputBuffer.clear();
         
         // Convert interleaved input to deinterleaved input buffer
         if (interleavedInput && numInputChannels > 0) {
             for (int sample = 0; sample < numSamples; ++sample) {
                 for (int ch = 0; ch < numInputChannels; ++ch) {
-                    inputChannelBuffer.getSample(static_cast<choc::buffer::ChannelCount>(ch), 
-                                               static_cast<choc::buffer::FrameCount>(sample)) = 
+                    engine->callbackInputBuffer.getSample(static_cast<choc::buffer::ChannelCount>(ch), 
+                                                         static_cast<choc::buffer::FrameCount>(sample)) = 
                         interleavedInput[sample * numInputChannels + ch];
                 }
             }
+        } else if (numInputChannels > 0) {
+            // Clear input buffer if no input data
+            engine->callbackInputBuffer.clear();
         }
         
         // Process the audio graph with both input and output buffers
         engine->processor->processGraph(
-            inputChannelBuffer.getView(),
-            outputChannelBuffer.getView(),
+            engine->callbackInputBuffer.getView(),
+            engine->callbackOutputBuffer.getView(),
             engine->sampleRate,
             numSamples
         );
@@ -261,8 +312,8 @@ int AudioEngine::paCallback(
         for (int sample = 0; sample < numSamples; ++sample) {
             for (int ch = 0; ch < numOutputChannels; ++ch) {
                 interleavedOutput[sample * numOutputChannels + ch] = 
-                    outputChannelBuffer.getSample(static_cast<choc::buffer::ChannelCount>(ch), 
-                                                static_cast<choc::buffer::FrameCount>(sample));
+                    engine->callbackOutputBuffer.getSample(static_cast<choc::buffer::ChannelCount>(ch), 
+                                                          static_cast<choc::buffer::FrameCount>(sample));
             }
         }
         

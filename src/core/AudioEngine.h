@@ -5,6 +5,7 @@
 #include <string>
 #include <memory>
 #include "AudioGraph.h"
+#include "../../lib/choc/audio/choc_SampleBuffers.h"
 #include "AudioNode.h"
 #include "../../lib/choc/audio/choc_SampleBuffers.h"
 #include "../../lib/choc/audio/choc_AudioFileFormat_WAV.h"
@@ -36,9 +37,9 @@ public:
     double getSampleRate() const { return sampleRate; }
     
     // Channel configuration
-    void setInputChannels(int channels) { inputChannels = channels; }
-    void setOutputChannels(int channels) { outputChannels = channels; }
-    void setChannels(int input, int output) { inputChannels = input; outputChannels = output; }
+    void setInputChannels(int channels);
+    void setOutputChannels(int channels);
+    void setChannels(int input, int output);
     int getInputChannels() const { return inputChannels; }
     int getOutputChannels() const { return outputChannels; }
 
@@ -85,6 +86,7 @@ private:
         void* userData);
 
     void enumerateDevices();
+    void ensureCallbackBuffersSize(int inputChannels, int outputChannels, int bufferSize);
 
     // PortAudio members
     PaStream* stream = nullptr;
@@ -98,4 +100,8 @@ private:
     // Audio graph system
     std::unique_ptr<AudioGraph> audioGraph;
     std::unique_ptr<AudioGraphProcessor> processor;
+    
+    // Pre-allocated buffers for audio callback (to avoid real-time allocations)
+    choc::buffer::ChannelArrayBuffer<float> callbackInputBuffer;
+    choc::buffer::ChannelArrayBuffer<float> callbackOutputBuffer;
 };
